@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pinterest Pin Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f8f8fb;
+      color: #111;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: #444;
+    }
+
+    form {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      margin-bottom: 24px;
+    }
+
+    label {
+      display: block;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input, textarea, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 15px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    button {
+      margin-top: 20px;
+      background: #111;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      opacity: 0.92;
+    }
+
+    .result {
+      display: grid;
+      gap: 18px;
+    }
+
+    .category {
+      background: #fff;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+
+    .pin {
+      border: 1px solid #eee;
+      padding: 14px;
+      border-radius: 10px;
+      margin-top: 12px;
+      background: #fafafa;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .loading {
+      margin: 20px 0;
+      font-weight: bold;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      background: #111;
+      color: #f5f5f5;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: #111;
+      border: 1px solid #ccc;
+    }
+
+    button.secondary:hover {
+      opacity: 1;
+      background: #f2f2f6;
+    }
+
+    .small {
+      padding: 10px;
+      font-size: 14px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pinterest Pin Generator</h1>
+  <p>Generează categorii, titluri, descrieri SEO, hashtaguri, boards și image hooks.</p>
+
+  <div class="category" id="pinterest-box">
+    <h2>Pinterest publishing</h2>
+    <p id="pinterest-status" class="muted">Checking connection...</p>
+    <div class="grid">
+      <button type="button" id="connect-pinterest">Connect Pinterest</button>
+      <button type="button" class="secondary" id="load-boards">Load boards</button>
+    </div>
+    <button type="button" class="secondary small" id="logout-pinterest" style="margin-top: 12px;">
+      Disconnect
+    </button>
+  </div>
+
+  <form id="generator-form">
+    <label for="productTitle">Product title</label>
+    <input
+      id="productTitle"
+      name="productTitle"
+      type="text"
+      placeholder="Ex: Nutrafol Shampoo, Cleanse and Hydrate Hair and Scalp..."
+      required
+    />
+
+    <label for="productDescription">Product description</label>
+    <textarea
+      id="productDescription"
+      name="productDescription"
+      placeholder="Descriere completă a produsului..."
+      required
+    ></textarea>
+
+    <div class="grid">
+      <div>
+        <label for="categoriesCount">Categories</label>
+        <input id="categoriesCount" name="categoriesCount" type="number" value="8" min="1" max="12" />
+      </div>
+      <div>
+        <label for="pinsPerCategory">Pins per category</label>
+        <input id="pinsPerCategory" name="pinsPerCategory" type="number" value="5" min="1" max="10" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label for="tone">Tone</label>
+        <input id="tone" name="tone" type="text" value="viral but not spammy" />
+      </div>
+      <div>
+        <label for="excludeWords">Exclude words</label>
+        <input id="excludeWords" name="excludeWords" type="text" value="Amazon" />
+      </div>
+    </div>
+
+    <label for="targetAudience">Target audience</label>
+    <input id="targetAudience" name="targetAudience" type="text" value="women interested in beauty, skincare, and self care" />
+
+    <label for="goal">Goal</label>
+    <input id="goal" name="goal" type="text" value="maximize Pinterest clicks and affiliate conversions" />
+
+    <label for="platform">Platform</label>
+    <input id="platform" name="platform" type="text" value="Pinterest" />
+
+    <button type="submit">Generate</button>
+  </form>
+
+  <div id="loading" class="loading" style="display:none;">Generating...</div>
+  <div id="result" class="result"></div>
+
+  <script>
+    const form = document.getElementById("generator-form");
+    const result = document.getElementById("result");
+    const loading = document.getElementById("loading");
+
+    const pinterestStatusEl = document.getElementById("pinterest-status");
+    const connectBtn = document.getElementById("connect-pinterest");
+    const loadBoardsBtn = document.getElementById("load-boards");
+    const logoutBtn = document.getElementById("logout-pinterest");
+
+    let boards = [];
+    let pinterestConnected = false;
+
+    connectBtn.addEventListener("click", () => {
+      window.location.href = "/auth/pinterest";
+    });
+
+    loadBoardsBtn.addEventListener("click", async () => {
+      await loadBoards();
+      refreshAllBoardSelects();
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await fetch("/api/pinterest/logout", { method: "POST" }).catch(() => {});
+      boards = [];
+      pinterestConnected = false;
+      setPinterestStatus("Disconnected.");
+      refreshAllBoardSelects();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      result.innerHTML = "";
+      loading.style.display = "block";
+
+      const payload = {
+        productTitle: document.getElementById("productTitle").value.trim(),
+        productDescription: document.getElementById("productDescription").value.trim(),
+        categoriesCount: Number(document.getElementById("categoriesCount").value),
+        pinsPerCategory: Number(document.getElementById("pinsPerCategory").value),
+        tone: document.getElementById("tone").value.trim(),
+        excludeWords: document.getElementById("excludeWords").value.trim(),
+        targetAudience: document.getElementById("targetAudience").value.trim(),
+        goal: document.getElementById("goal").value.trim(),
+        platform: document.getElementById("platform").value.trim()
+      };
+
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Unknown error");
+        }
+
+        renderResult(data);
+      } catch (err) {
+        result.innerHTML = `<div class="category"><strong>Error:</strong> ${err.message}</div>`;
+      } finally {
+        loading.style.display = "none";
+      }
+    });
+
+    function renderResult(data) {
+      const wrapper = document.createElement("div");
+
+      const title = document.createElement("div");
+      title.className = "category";
+      title.innerHTML = `
+        <h2>${escapeHtml(data.product_name)}</h2>
+        <p class="muted">Generated categories: ${data.categories.length}</p>
+      `;
+      wrapper.appendChild(title);
+
+      data.categories.forEach((cat, index) => {
+        const el = document.createElement("div");
+        el.className = "category";
+
+        el.innerHTML = `
+          <h3>${index + 1}. ${escapeHtml(cat.category_name)}</h3>
+          <p><strong>Main keyword:</strong> ${escapeHtml(cat.keyword)}</p>
+          <p><strong>Search intent:</strong> ${escapeHtml(cat.search_intent)}</p>
+          <p><strong>Angle:</strong> ${escapeHtml(cat.angle)}</p>
+          <p><strong>Board:</strong> ${escapeHtml(cat.board_name)}</p>
+          <p><strong>Board description:</strong> ${escapeHtml(cat.board_description)}</p>
+          <p><strong>Tagged topics:</strong> ${cat.tagged_topics.map(escapeHtml).join(", ")}</p>
+        `;
+
+        cat.pins.forEach((pin, pinIndex) => {
+          const pinEl = document.createElement("div");
+          pinEl.className = "pin";
+          pinEl.innerHTML = `
+            <h4>Pin ${pinIndex + 1}: ${escapeHtml(pin.title)}</h4>
+            <p><strong>Description:</strong> ${escapeHtml(pin.description)}</p>
+            <p><strong>Hashtags:</strong> ${pin.hashtags.map(escapeHtml).join(" ")}</p>
+            <p><strong>Image hook:</strong> ${escapeHtml(pin.image_hook)}</p>
+            <p><strong>Pin style:</strong> ${escapeHtml(pin.pin_style)}</p>
+          `;
+
+          const publishBox = document.createElement("div");
+          publishBox.style.marginTop = "12px";
+          publishBox.innerHTML = `
+            <p class="muted"><strong>Publish</strong> (choose board, upload image, optionally add link)</p>
+
+            <label>Board</label>
+            <select class="board-select">
+              ${getBoardOptionsHtml()}
+            </select>
+
+            <label>Affiliate link (optional)</label>
+            <input class="pin-link" type="url" placeholder="https://example.com/your-affiliate-link" />
+
+            <label>Image (JPG/PNG)</label>
+            <input class="pin-image" type="file" accept="image/png,image/jpeg" />
+
+            <button type="button" class="secondary small publish-btn">Publish this pin</button>
+            <div class="muted publish-status" style="margin-top: 8px;"></div>
+          `;
+
+          const publishBtn = publishBox.querySelector(".publish-btn");
+          const statusEl = publishBox.querySelector(".publish-status");
+          const boardSelect = publishBox.querySelector(".board-select");
+          const linkInput = publishBox.querySelector(".pin-link");
+          const fileInput = publishBox.querySelector(".pin-image");
+
+          publishBtn.addEventListener("click", async () => {
+            statusEl.textContent = "";
+
+            if (!pinterestConnected) {
+              statusEl.textContent = "Connect Pinterest first.";
+              return;
+            }
+
+            const boardId = boardSelect.value;
+            if (!boardId) {
+              statusEl.textContent = "Pick a board (click “Load boards” first).";
+              return;
+            }
+
+            const file = fileInput.files?.[0] || null;
+            if (!file) {
+              statusEl.textContent = "Upload an image first.";
+              return;
+            }
+
+            const affiliateLink = linkInput.value.trim();
+            const fullDescription = `${pin.description}\n\n${pin.hashtags.join(" ")}`.slice(0, 800);
+
+            const fd = new FormData();
+            fd.append("boardId", boardId);
+            fd.append("title", pin.title);
+            fd.append("description", fullDescription);
+            fd.append("link", affiliateLink);
+            fd.append("altText", pin.image_hook || pin.title);
+            fd.append("image", file);
+
+            publishBtn.disabled = true;
+            statusEl.textContent = "Publishing...";
+
+            try {
+              const res = await fetch("/api/pinterest/pins", {
+                method: "POST",
+                body: fd
+              });
+
+              const payload = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                throw new Error(payload.error || "Publish failed");
+              }
+
+              const id = payload.id ? `Pin ID: ${payload.id}` : "Published.";
+              statusEl.textContent = `Success. ${id}`;
+            } catch (e) {
+              statusEl.textContent = `Error: ${e.message}`;
+            } finally {
+              publishBtn.disabled = false;
+            }
+          });
+
+          pinEl.appendChild(publishBox);
+          el.appendChild(pinEl);
+        });
+
+        wrapper.appendChild(el);
+      });
+
+      const raw = document.createElement("div");
+      raw.className = "category";
+      raw.innerHTML = `
+        <h3>Raw JSON</h3>
+        <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+      `;
+      wrapper.appendChild(raw);
+
+      result.appendChild(wrapper);
+    }
+
+    function setPinterestStatus(text) {
+      pinterestStatusEl.textContent = text;
+    }
+
+    async function refreshPinterestStatus() {
+      try {
+        const res = await fetch("/api/pinterest/status");
+        const data = await res.json();
+        pinterestConnected = Boolean(data.connected);
+        setPinterestStatus(
+          pinterestConnected
+            ? "Connected. Click “Load boards” to fetch your boards."
+            : "Not connected. Click “Connect Pinterest”."
+        );
+      } catch {
+        pinterestConnected = false;
+        setPinterestStatus("Unable to reach backend.");
+      }
+    }
+
+    async function loadBoards() {
+      if (!pinterestConnected) {
+        setPinterestStatus("Not connected. Click “Connect Pinterest”.");
+        return;
+      }
+
+      setPinterestStatus("Loading boards...");
+      const res = await fetch("/api/pinterest/boards");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPinterestStatus(`Boards error: ${data.error || "Unknown error"}`);
+        return;
+      }
+
+      boards = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : [];
+      setPinterestStatus(`Boards loaded: ${boards.length}`);
+    }
+
+    function getBoardOptionsHtml() {
+      if (!boards.length) {
+        return `<option value="">(Load boards)</option>`;
+      }
+
+      return boards
+        .map((b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`)
+        .join("");
+    }
+
+    function refreshAllBoardSelects() {
+      document.querySelectorAll(".board-select").forEach((sel) => {
+        const current = sel.value;
+        sel.innerHTML = getBoardOptionsHtml();
+        if (current) sel.value = current;
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    // Initial load
+    refreshPinterestStatus();
+  </script>
+</body>
+</html>

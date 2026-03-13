@@ -1,0 +1,16 @@
+{
+  "name": "pinterest-pin-generator",
+  "version": "1.0.0",
+  "description": "Local Pinterest SEO pin generator",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "multer": "^2.1.1",
+    "openai": "^4.104.0"
+  }
+}
